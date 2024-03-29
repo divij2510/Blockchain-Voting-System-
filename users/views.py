@@ -4,7 +4,7 @@ from rest_framework import status
 from web3 import Web3
 from .models import Candidate, Vote, Voter
 from .serializers import CandidateSerializer, VoteSerializer
-import json, random
+import random
 from django.conf import settings
 from django.core.mail import send_mail
 
@@ -14,9 +14,216 @@ w3 = Web3(Web3.HTTPProvider(ganache_url))
 
 # Load the contract ABI and address
 
-with open("././voting_app/build/contracts/Voting.json") as f:
-    contract_data = json.load(f)
-    contract_abi = contract_data['abi']
+contract_abi = [
+    {
+        "anonymous": False,
+        "inputs": [
+            {
+                "indexed": True,
+                "internalType": "uint256",
+                "name": "candidateId",
+                "type": "uint256"
+            },
+            {
+                "indexed": False,
+                "internalType": "string",
+                "name": "name",
+                "type": "string"
+            }
+        ],
+        "name": "CandidateAdded",
+        "type": "event"
+    },
+    {
+        "anonymous": False,
+        "inputs": [
+            {
+                "indexed": True,
+                "internalType": "uint256",
+                "name": "voteId",
+                "type": "uint256"
+            },
+            {
+                "indexed": False,
+                "internalType": "uint256",
+                "name": "candidateId",
+                "type": "uint256"
+            }
+        ],
+        "name": "VoteCast",
+        "type": "event"
+    },
+    {
+        "inputs": [],
+        "name": "candidateCount",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function",
+        "constant": True
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "candidates",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "id",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "name",
+                "type": "string"
+            },
+            {
+                "internalType": "uint256",
+                "name": "voteCount",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function",
+        "constant": True
+    },
+    {
+        "inputs": [],
+        "name": "voteCount",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function",
+        "constant": True
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "votes",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "blockId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "uniqueId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "candidateId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "timestamp",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function",
+        "constant": True
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "string",
+                "name": "_name",
+                "type": "string"
+            }
+        ],
+        "name": "addCandidate",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "_candidateId",
+                "type": "uint256"
+            }
+        ],
+        "name": "vote",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "getVoteCount",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function",
+        "constant": True
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "_voteId",
+                "type": "uint256"
+            }
+        ],
+        "name": "getVote",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function",
+        "constant": True
+    }
+]
+
+
 
 contract_address = "0x826444067dFC409BD9a6c223f80B268Fa73F3DCb" # deployed contract address
 
@@ -32,7 +239,7 @@ class SendEmailView(APIView):
             voter = Voter.objects.get(email_id=to_email)
         except Voter.DoesNotExist:
             return Response({'error':'Invalid Voter Email'},status=status.HTTP_400_BAD_REQUEST)
-        
+
         otp = ''.join(random.choices('0123456789', k=6))
         request.session['otp']=otp
         request.session['email']=to_email
@@ -43,7 +250,7 @@ class SendEmailView(APIView):
         recipients = [to_email]
         send_mail(subject, message, from_email, recipients, fail_silently=True)
         return Response(status=status.HTTP_200_OK)
-        
+
 class VerifyEmailView(APIView):
     def post(self, request):
         otp = request.data.get('otp')
@@ -52,11 +259,11 @@ class VerifyEmailView(APIView):
             voter = Voter.objects.get(email_id=request.session.get('email'))
         except Voter.DoesNotExist:
             return Response({'error':'Invalid Voter Session'},status=status.HTTP_400_BAD_REQUEST)
-        
+
         if otp == request.session.get('otp'):
             voter.delete()
             return Response(status=status.HTTP_200_OK)
-        
+
         return Response({'error':'Incorrect OTP!'},status=status.HTTP_400_BAD_REQUEST)
 
 class AddCandidateView(APIView):
@@ -99,4 +306,12 @@ class DisplayVotesView(APIView):
         votes = Vote.objects.all()
         serializer = VoteSerializer(votes, many=True)
         return Response(serializer.data)
-    
+
+class AddVoterView(APIView):
+    def post(self, request):
+        emails = request.data.get('emails',[])
+        if not emails:
+            return Response({'error':'No emmails provided'}, status=status.HTTP_400_BAD_REQUEST)
+        for email in emails:
+            voter = Voter.objects.create(email_id=email)
+        return Response({'message':'voters registered successfully'}, status=status.HTTP_201_CREATED)
