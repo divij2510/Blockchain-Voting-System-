@@ -24,3 +24,4 @@ class VoteSerializer(serializers.ModelSerializer):
     def get_formatted_timestamp(self, obj):
         dt = datetime.datetime.fromtimestamp(obj.timestamp)
         return dt.strftime('%Y-%m-%d %H:%M:%S')
+    

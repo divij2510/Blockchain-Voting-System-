@@ -2,6 +2,7 @@ from django.db import models
 
 class Voter(models.Model):
     email_id = models.CharField(max_length=50)
+    otp = models.BigIntegerField(null=True)
 
 class Candidate(models.Model):
     name = models.CharField(max_length=100)
